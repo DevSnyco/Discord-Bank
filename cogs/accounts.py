@@ -8,6 +8,22 @@ from discord import Embed, Interaction
 from discord.app_commands import autocomplete, command
 from discord.ext.commands import Bot, GroupCog
 
+from autocomplete import Autocomplete
+
+if os.getenv("MONGO_TLS") == "True":
+	AUTOCOMPLETE = Autocomplete(
+		AsyncIOMotorClient(
+			os.getenv("MONGO"),
+			tls = True,
+			tlsCertificateKeyFile = "mongo_cert.pem"
+		)["bank"]
+	)
+else:
+	AUTOCOMPLETE = Autocomplete(
+		AsyncIOMotorClient(os.getenv("MONGO"))["bank"]
+	)
+
+
 class Accounts(GroupCog, group_name = "account"):
 	def __init__(self, bot: Bot):
 		self.bot = bot
@@ -88,6 +104,7 @@ class Accounts(GroupCog, group_name = "account"):
 		name = "balance",
 		description = "Check the balance on your bank account."
 	)
+	@autocomplete(account = AUTOCOMPLETE.internal_accounts)
 	async def balance(self, interaction: Interaction, account_number: str):
 		for account in await self.bot.database["users"].find_one(
 			{
