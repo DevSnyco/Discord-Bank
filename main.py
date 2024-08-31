@@ -56,4 +56,5 @@ class DiscordBank(Bot):
 		Console.info("Setup hook completed")
 
 if __name__ == "__main__":
-	asyncio.run(DiscordBank().start(os.getenv("TOKEN")))
+	load_dotenv(find_dotenv())
+	DiscordBank().run(os.getenv("TOKEN"))
