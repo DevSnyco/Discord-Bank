@@ -84,5 +84,24 @@ class Accounts(GroupCog, group_name = "account"):
 			)
 			return await interaction.response.send_message(embed = embed, ephemeral = True)
 
+	@command(
+		name = "balance",
+		description = "Check the balance on your bank account."
+	)
+	async def balance(self, interaction: Interaction, account_number: str):
+		for account in await self.bot.database["users"].find_one(
+			{
+				"_id": interaction.user.id
+			}
+		).get("accounts"):
+			if int(account_number) == account.get("account"):
+				embed = Embed(
+					description = f"# > {os.getenv("MONEY_EMOJI")} {account.get("balance"):.2f}",
+					colour = 0x313338
+				)
+				return await interaction.response.send_message(embed = embed, ephemeral = True)
+
+		return await interaction.response.send_message(f"{os.getenv("FAILED_EMOJI")} Couldn't find that account under your Discord ID.")
+
 async def setup(bot: Bot):
 	await bot.add_cog(Accounts(bot))
