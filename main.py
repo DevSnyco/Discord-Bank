@@ -22,22 +22,33 @@ class DiscordBank(Bot):
 	async def setup_hook(self) -> Coroutine[Any, Any, None]:
 		Console.info("Setup hook initiated")
 		if os.getenv("MONGO_TLS") == "True":
-			self.database = AsyncIOMotorClient(
+			client = AsyncIOMotorClient(
 				os.getenv("MONGO"),
 				tls = True,
 				tlsCertificateKeyFile = "mongo_cert.pem"
-			)["bank"]
+			)
+			try:
+				await client.admin.command('ping')
+				Console.info("Connected to MongoDB")
+			except:
+				Console.warn("MongoDB Failed to connect")
+			self.database = client["bank"]
+
 		else:
-			self.database = AsyncIOMotorClient(os.getenv("MONGO"))["bank"]
+			client = AsyncIOMotorClient(os.getenv("MONGO"))
+			try:
+				await client.admin.command('ping')
+				Console.info("Connected to MongoDB")
+			except:
+				Console.warn("MongoDB Failed to connect")
+			self.database = client["bank"]
 
 		for file in os.listdir("./cogs"):
 			if file.endswith(".py"):
 				try:
 					await self.load_extension(f"cogs.{file[:-3]}")
-					self.loaded_extension_list.append(file[:-3])
 					Console.info(f"Loaded \"\033[93m{file[:-3]}\033[0m\" extension")
 				except Exception as error:
-					self.unloaded_extension_list.append(file[:-3])
 					Console.error(error)
 					continue
 
