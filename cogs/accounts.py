@@ -43,6 +43,7 @@ class Accounts(GroupCog, group_name = "account"):
 			account_number = randint(100000000, 999999999)
 			await self.bot.database["users"].insert_one(
 				{
+					"_id": interaction.user.id,
 					"accounts": [
 						{
 							"account": account_number,
