@@ -8,6 +8,8 @@ from discord import Embed, Interaction
 from discord.app_commands import autocomplete, command
 from discord.ext.commands import Bot, GroupCog
 
+from validity import Validity
+from buttons import TransactionButtons
 from autocomplete import Autocomplete
 
 if os.getenv("MONGO_TLS") == "True":
@@ -101,24 +103,71 @@ class Accounts(GroupCog, group_name = "account"):
 			return await interaction.response.send_message(embed = embed, ephemeral = True)
 
 	@command(
+		name = "send",
+		description = "Send money to someone's bank account."
+	)
+	@autocomplete(account_number = AUTOCOMPLETE.internal_accounts)
+	async def send(self, interaction: Interaction, account_number: str, receipient: str, amount: float):
+		if not await Validity.has_any_accounts(
+			interaction,
+			mongo_session = self.bot.database["users"]
+		):
+			return await interaction.response.send_message(f"{os.getenv("FAILED_EMOJI")} You don't have any bank accounts registered with us.")
+
+		sender_account = await self.bot.database["users"].find_one(
+			{
+				"_id": interaction.user.id
+			}
+		)
+		receipient_account = await self.bot.database["users"].find_one(
+			{
+				"accounts.account": receipient
+			}
+		)
+
+		if sender_account.get("balance") < amount:
+			return await interaction.response.send_message(f"{os.getenv("FAILED_EMOJI")} You don't have sufficient funds to complete this transaction.")
+
+		for account in sender_account.get("accounts"):
+			if account.get("account") == int(account_number):
+				receipient_user = self.bot.get_user(receipient_account.get("_id"))
+				embed = Embed(
+					description = f"You are sending the following amount to `{receipient_user.name}`\n# > {os.getenv("MONEY_EMOJI")} {amount:.2f}\n**Note:** You cannot undo this transaction.",
+					colour = 0x313338
+				)
+
+				await interaction.response.send_message(
+					embed = embed,
+					view = TransactionButtons(
+						mongo_session = self.bot.database["users"],
+						sender = account_number,
+						receipient = receipient,
+						amount = amount
+					),
+					ephemeral = True
+				)
+
+	@command(
 		name = "balance",
 		description = "Check the balance on your bank account."
 	)
 	@autocomplete(account = AUTOCOMPLETE.internal_accounts)
 	async def balance(self, interaction: Interaction, account_number: str):
-		for account in await self.bot.database["users"].find_one(
-			{
-				"_id": interaction.user.id
-			}
-		).get("accounts"):
-			if int(account_number) == account.get("account"):
-				embed = Embed(
-					description = f"# > {os.getenv("MONEY_EMOJI")} {account.get("balance"):.2f}",
-					colour = 0x313338
-				)
-				return await interaction.response.send_message(embed = embed, ephemeral = True)
-
-		return await interaction.response.send_message(f"{os.getenv("FAILED_EMOJI")} Couldn't find that account under your Discord ID.")
+		try:
+			for account in await self.bot.database["users"].find_one(
+				{
+					"_id": interaction.user.id
+				}
+			).get("accounts"):
+				if int(account_number) == account.get("account"):
+					embed = Embed(
+						description = f"# > {os.getenv("MONEY_EMOJI")} {account.get("balance"):.2f}",
+						colour = 0x313338
+					)
+					return await interaction.response.send_message(embed = embed, ephemeral = True)
+			return await interaction.response.send_message(f"{os.getenv("FAILED_EMOJI")} Couldn't find that account under your Discord ID.")
+		except:
+			return await interaction.response.send_message(f"{os.getenv("FAILED_EMOJI")} You don't have any bank accounts registered with us.")
 
 async def setup(bot: Bot):
 	await bot.add_cog(Accounts(bot))
